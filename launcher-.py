@@ -2,24 +2,61 @@ import os
 import sys
 import stat
 import configparser
+import requests
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QComboBox, QSpinBox, QPushButton, QWidget, QMessageBox
+    QComboBox, QSpinBox, QPushButton, QWidget, QMessageBox, QInputDialog
 )
 from PyQt5.QtGui import QPixmap
 
+# Configuración de GitHub
+REPO_OWNER = "chiveta"  # Reemplazar con tu nombre de usuario
+REPO_NAME = "LauncherGears3"  # Reemplazar con el nombre del repositorio
+GITHUB_API_URL = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/tags"
+RAW_BASE_URL = f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}"
 
 def remove_readonly(file_path):
     """Quitar el modo solo lectura de un archivo."""
     if os.path.exists(file_path):
         os.chmod(file_path, os.stat(file_path).st_mode | stat.S_IWRITE)
 
-
 def set_readonly(file_path):
     """Restaurar el modo solo lectura de un archivo."""
     if os.path.exists(file_path):
         os.chmod(file_path, os.stat(file_path).st_mode & ~stat.S_IWRITE)
 
+class VersionManager:
+    """Gestión de versiones del script desde GitHub."""
+
+    @staticmethod
+    def obtener_versiones():
+        try:
+            response = requests.get(GITHUB_API_URL)
+            if response.status_code == 200:
+                tags = response.json()
+                return [tag['name'] for tag in tags]
+            else:
+                QMessageBox.critical(None, "Error", f"No se pudo obtener versiones. Código: {response.status_code}")
+                return []
+        except Exception as e:
+            QMessageBox.critical(None, "Error", f"Error al obtener versiones: {e}")
+            return []
+
+    @staticmethod
+    def descargar_version(version):
+        try:
+            script_url = f"{RAW_BASE_URL}/{version}/launcher.py"
+            response = requests.get(script_url)
+
+            if response.status_code == 200:
+                # Sobrescribir el archivo actual
+                with open(__file__, 'w', encoding='utf-8') as file:
+                    file.write(response.text)
+                QMessageBox.information(None, "Actualización", f"Versión {version} descargada con éxito. Reinicia el programa.")
+            else:
+                QMessageBox.critical(None, "Error", f"No se pudo descargar la versión {version}. Código: {response.status_code}")
+        except Exception as e:
+            QMessageBox.critical(None, "Error", f"Error al descargar la versión {version}: {e}")
 
 class PreviewSimulator:
     def __init__(self):
@@ -50,7 +87,6 @@ class PreviewSimulator:
         else:
             return self.images[graphics_level]["FOV70"]
 
-
 class OptionsWindow(QMainWindow):
     def __init__(self, ini_paths, camera_paths):
         super().__init__()
@@ -73,7 +109,7 @@ class OptionsWindow(QMainWindow):
         # Singleplayer Options
         sp_layout = QVBoxLayout()
         sp_label = QLabel("Singleplayer Options")
-        sp_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
+        sp_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold ;")
         sp_layout.addWidget(sp_label)
 
         self.sp_fields = self.create_option_fields(sp_layout, "SP")
@@ -99,15 +135,29 @@ class OptionsWindow(QMainWindow):
         save_button.setStyleSheet("color: white; font-size: 14px;")
         save_button.clicked.connect(self.save_all_configs)
 
+        # Update Button
+        update_button = QPushButton("Check for Updates")
+        update_button.setStyleSheet("color: white; font-size: 14px;")
+        update_button.clicked.connect(self.check_for_updates)
+
         main_layout = QVBoxLayout()
         main_layout.addLayout(layout)
         main_layout.addWidget(save_button)
+        main_layout.addWidget(update_button)
 
         container = QWidget()
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
         self.update_preview()
+
+    def check_for_updates(self):
+        """Verificar y descargar actualizaciones disponibles."""
+        versions = VersionManager.obtener_versiones()
+        if versions:
+            version, ok = QInputDialog.getItem(self, "Select Version", "Available Versions:", versions, 0, False)
+            if ok and version:
+                VersionManager.descargar_version(version)
 
     def load_ini_files(self):
         """Cargar archivos INI."""
@@ -124,7 +174,7 @@ class OptionsWindow(QMainWindow):
         if os.path.exists(image_path):
             pixmap = QPixmap(image_path)
             self.background_label.setPixmap(pixmap)
-            self.background_label .setScaledContents(True)
+            self.background_label.setScaledContents(True)
             self.background_label.setGeometry(self.rect())
         else:
             QMessageBox.critical(self, "Error", f"Background image '{image_path}' not found.")
@@ -304,7 +354,6 @@ class OptionsWindow(QMainWindow):
         except Exception as e:
             print(f"Error al actualizar la vista previa: {e}")
 
-
 class Launch3r(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -350,7 +399,7 @@ class Launch3r(QMainWindow):
             pixmap = QPixmap(image_path)
             self.background_label.setPixmap(pixmap)
             self.background_label.setScaledContents(True)
-            self.background_label.setGeometry (self.rect())
+            self.background_label.setGeometry(self.rect())
         else:
             QMessageBox.critical(self, "Error", f"Background image '{image_path}' not found.")
             sys.exit()
@@ -376,7 +425,6 @@ class Launch3r(QMainWindow):
     def open_options(self):
         self.options_window = OptionsWindow(self.ini_paths, self.camera_paths)
         self.options_window.show()
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
