@@ -12,8 +12,6 @@ from PyQt5.QtGui import QPixmap
 # Configuración de GitHub
 REPO_OWNER = "chiveta"  # Reemplazar con tu nombre de usuario
 REPO_NAME = "LauncherGears3"  # Reemplazar con el nombre del repositorio
-GITHUB_API_URL = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/tags"
-RAW_BASE_URL = f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}"
 
 def remove_readonly(file_path):
     """Quitar el modo solo lectura de un archivo."""
@@ -45,14 +43,18 @@ class VersionManager:
     @staticmethod
     def descargar_version(version):
         try:
-            script_url = f"{RAW_BASE_URL}/{version}/launcher.py"
-            response = requests.get(script_url)
-
+            # URL del archivo en los releases
+            asset_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/download/{version}/launcher.py"
+            
+            # Realiza la solicitud a la URL
+            response = requests.get(asset_url)
+            
             if response.status_code == 200:
                 # Sobrescribir el archivo actual
                 with open(__file__, 'w', encoding='utf-8') as file:
                     file.write(response.text)
                 QMessageBox.information(None, "Actualización", f"Versión {version} descargada con éxito. Reinicia el programa.")
+                sys.exit()  # Sal del programa para que el usuario lo reinicie
             else:
                 QMessageBox.critical(None, "Error", f"No se pudo descargar la versión {version}. Código: {response.status_code}")
         except Exception as e:
